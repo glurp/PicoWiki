@@ -29,9 +29,9 @@ Todo
 
 Usage
 -----
-
+    > gem install sinatra redcarpet diff-lcs
     > cd ...wiki-root
-    > ruby /path/wiki.rb [tcp-port]
+    > ruby /path-to-source/wiki.rb [tcp-port]
 
 
 wiki data are in the current directory (wikiroot in the example)

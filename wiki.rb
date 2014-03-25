@@ -193,6 +193,9 @@ def flog()           "wiki/event.log"         end
 unless File.exists?(page_fname('index'))
    page_stock("index","<creation>",$index)
 end
+unless File.exists?(flog())
+   File.write(flog(),"creation")
+end
 
 get '/' do redirect '/page/index' end
 
