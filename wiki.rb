@@ -199,7 +199,6 @@ def page_make_summary1()
   fils=Hash.new { |h,pere| h[pere]=[]}
   pere=Hash.new { |h,fils| h[fils]=[]}
   l=Dir["#{File.dirname(page_fnamenv("s"))}/*"].map { |fn|
-    p fn
     next if fn =~/\.diff$/
     refpage(File.read(fn)).each { |r| 
       fils[r] << File.basename(fn)
@@ -241,22 +240,42 @@ def make_sentry(n,regexp,line)
 end
 
 def search(words) 
-  rr= /^(.*?)(#{words.split(/\s+/).join('|')})(.*?)^/im
-  r2= /(#{words.split(/\s+/).join('|')})/i
-  p rr,r2
+  rsearch= /^(.*?)(#{words.split(/\s+/).join('|')})(.*?)^/im
+  rbold= /(#{words.split(/\s+/).join('|')})/i
   ret=[]
   Dir.glob(root()+"/data/*.diff").each { |fn|
      f= fn.split(".")[0..-2].join(".")
-     p f
-     File.read(f).gsub( rr ) { |l1,l2,l3|
-        p l1
-        p l2
-        p l3
-        ret << make_sentry(File.basename(f),r2,"#{l1}#{l2}#{l3}")
+     File.read(f).gsub( rsearch ) { |l1,l2,l3|
+        ret << make_sentry(File.basename(f),rbold,"#{l1}#{l2}#{l3}")
      }
      break if ret.size>100
   }
   page_make_view("","<h3>Search</h3><br><br>#{ret.join("<br/>")}<br>")
+end
+def plan
+  fils=Hash.new { |h,pere| h[pere]=[]}
+  pere=Hash.new { |h,fils| h[fils]=[]}
+  l=Dir["#{File.dirname(page_fnamenv("s"))}/*"].map { |fn|
+    next if fn =~/\.diff$/
+    refpage(File.read(fn)).each { |r| 
+      fils[r] << File.basename(fn)
+      pere[File.basename(fn)] << r
+    }
+  }
+  
+  hdone={}
+  frm=proc { |level,parent,s| 
+     hdone[parent]=true
+     s << [level,parent]
+     pere[parent].each_with_index { |f,i| frm.call("#{level}.#{i+1}",f,s) if ! hdone[f]}
+  }
+  ["index"].each_with_object([]) { |p,la| frm.call("",p,la) }
+end
+def page_export
+ plan.map { |(level,name)|
+   content=wiki_render(File.read(page_fname(name)).gsub(">","&gt;").gsub("<","&lt;")).gsub(/<(\/)?h1>/,'<\1h2>')
+   "<h1 class='hdoc'>#{level} #{name}</h1>\n#{content}"
+ }.join("<br>")
 end
 #########################################################
 #         web
@@ -369,6 +388,25 @@ get '/help' do
  $help
 end
 
+get '/admin/:cat' do
+ cat=params['cat']
+ title="Admin"
+ case cat
+  when "menu"
+    l=%w{export backup}
+    c="<ul>"+l.map {|a| "<li><a href='/admin/#{a}'>#{a}</a></li>"}.join("\n")+"</ul>"
+    page_make_view(title,"<h1>Administration</h1><br><br>#{c}<br>")
+  when "export"
+    page_make_view("",page_export)
+  when "backup"
+    name="wiki_backup_#{Time.now.strftime('%Y_%m_%d')}.tgz"
+    system("tar","czf",name,root())
+    s=File.size(name)
+    page_make_view(title,"<h1>Administration</h1><br><br><a href='/#{name}'>downoad #{s/1024} Kb...</a><br><br><br>")
+ end
+  
+end
+
 get '/css' do 
   content_type :css
   fn=page_fname("css")
@@ -425,6 +463,7 @@ will be created, empty ...
     <div id='title'>
       %NAME%
       <div class='search'>
+         search :
          <input type='text' id='search' value=''>
          <input type='button' value=' go ' onclick="location.href='/search/'+document.getElementById('search').value">
       </div>
@@ -441,7 +480,8 @@ will be created, empty ...
       <a href='/orphean'>Integrity check</a> |
       <a href='/list'>Page list</a> |
       <a href='/logs'>History</a> |
-      <a href='/page/index'>((Home))</a> |
+      <a href='/admin/menu'>admin</a> |
+      <a href='/page/index'> Home </a>
     </div>
     <script type="text/javascript">
         var ws = null;
@@ -541,15 +581,27 @@ Lien officiel: <a href='http://daringfireball.net/projects/markdown/syntax'>Doc<
 </html>
 @@ css
 body { margin: 0px;}
+
 h1   { background: #006666; color: white ; text-align: center;padding: 10px 0px 10px 0px;}
+h1.hdoc { background: #FFF; color: #000; text-align: left; padding: 10px 0px 10px 0px; border-bottom: 2px solid black;}
 div#title   {  color: #EE8833 ; text-align: left; font-size: 30px; margin-left: 20px}
+
 div#footer   {  margin-left: 10px; border-top: 2px solid black; padding-top: 10px;text-align: center;}
+
 div#container   {   margin-left: 30px}
+
 div#footer a { font-weight: bold; ; color: #B73;}
+
 table.grid { border: 2px solid #044 ; border-collapse: collapse ; width:90%}
+
 table.grid th { border: 2px solid #AAA ; background: #FFA;}
+
 table.grid td { border: 2px solid #AAA ; margin: 3px 10px 3px 10px;}
+
 div.bc { margin: 10px 100px 10px 100px; background: #FFA; border: 2px solid black;width:300px;}
-div.search {  position:absolute; text-align:right; right:0px; top:0px;}
+
+div.search {  position:absolute; text-align:right; right:10px; top:0px;}
+
 div.searchheader { font-weight: bold; color: #46F;}
 div.scontent     { width:70%;}
+

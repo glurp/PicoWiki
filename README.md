@@ -12,9 +12,10 @@ PicoWiki :
 Features
 
 * view, edit, link, rename, delete pages
-* search
+* search, 
+* admin: export (to one html file), backup (download dated tgz)
 * automatic summary (reflexion on pages contents and directories contents)
-* list of orphean pages
+* integrity check:  list of orphean pages, list of dead link pages, check at server startup
 
 Inspired by tipiwiki (php).
 
@@ -23,8 +24,8 @@ Todo
 
 * images upload,...
 * authentification (?)
-* Websocket not ready : the idea is to make wki page dynamics...
-* mini file explorer, dropbox like : every user can upload/consult/download some files
+* Websocket not ready : the idea is to make wiki pages dynamics...
+* mini file explorer, dropbox like : every user could upload/consult/download some files
 
 
 Usage
