@@ -1,15 +1,23 @@
 ï»¿#!/usr/bin/env ruby
+# LGPL V2.1 () Regis d'Aubarede
+
 ###########################################################################################
-#  wiki.rb : wiki dynamique : wiki+ tous les connecté 
-#            sont averites en temps reel des nouveautées
+#  wiki.rb 
 ###########################################################################################
 require 'sinatra'
-require 'sinatra-websocket'
+require 'sinatra-websocket' rescue nil
 require 'redcarpet' 
+require 'tmpdir'
+require 'diffy'
 
-require 'diff/lcs'
-def diff(s1,s2) Diff::LCS.LCS(s1, s2) end
-def patch(s1,diff) Diff::LCS.patch!(seq1, diffs) end
+def root() "wiki" end
+
+
+        
+def diff(old,neww)  [old,neww].inspect       end
+def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
+def diff_css()      Diffy::CSS              end
+def rpatch(neww,d)  eval(d)[0]              end
 
 set :server, 'thin'  
 set :sockets, []
@@ -20,25 +28,49 @@ set :port, ARGV[0] || 9191
 
 
 #########################################################
-##
+##  Utilities
+#########################################################
+def memoized(filename,traitment)
+  if File.exists?(filename)
+     File.read(filename)
+  else
+     content=traitment.call
+     File.write(filename,content)
+     content
+  end
+end
+def sjoin(pre,a,join,post) 
+  "#{pre}#{(a||yield).join(join)}#{post}" 
+end
+def table2html(titles,content)
+  h= titles ? sjoin("<tr><th>",titles,"</th><th>","</th></tr>") : ""
+  b= sjoin("<tr>",nil,"</tr><tr>","</tr>") { content.map { |l| l ? sjoin("<td>",l,"</td><td>","</td>") : "" } }
+  "<table class='grid'>#{h}#{b}</table>"
+end
+
+#########################################################
+##   wiki actions traitments
 #########################################################
 
-def refpage(t) 
- t.scan(/\[(\w+)\](?!\()/).map { |pn| pn.first }
-end
+def refpage(t)  t.scan(/\[(\w+)\](?!\()/).map { |pn| pn.first } end
 
 def  page_make_view(name,md=nil)
+ if name=="templates" 
+   md="not viewable!"
+ end
  md=wiki_render( File.read(page_fname(name)) ) unless md
- md=resolve(md)
+ md=resolve_page_href(md)
  $template.gsub("%NAME%",name).gsub("%%%",md)
 end
+
 def page_make_edit(name)
-  content=File.read(page_fname(name))
+  content=File.read(page_fname(name)).gsub(">","&gt;").gsub("<","&lt;")
   $edit.gsub("%NAME%",name).gsub("%%%",content)
 end
 
 def page_stock(name,diff,content)
- page_creation(name,content)
+ content.gsub!("\r\n","\n")
+ page_creation_on_content(name,content)
  filename=page_fname(name)
  fdiff=page_fdiff(name)
  File.open(fdiff,"a+") { |f| f.puts("%%% #{Time.now}") ; f.puts(diff) }
@@ -48,26 +80,29 @@ end
 
 def page_history(name)
  fdiff=page_fdiff(name)
- logs=File.read(fdiff).split(/\r?\n/).select { |line| line=~/^%%% .*$/}
+ logs=File.read(fdiff).split(/\r?\n/).select { |line| line=~/^%%% .*$/}.map {|l| 
+   date=l.gsub("%%%","").strip
+   "<a href='/modif/#{name}/#{date}'>#{date}</a>"
+ }
  page_make_view(name,"<h3>History of modification on '#{name}'</h3><br><br>#{logs.join("<br/>")}<br>")
 end
 
-def page_creation(name,content)
+def page_creation_on_content(name,content)
   refpage(content).select { |pn| ! File.exists?(page_fname(pn)) }.each do |pn| 
     page_create(pn)
   end
 end
 
-def resolve(t)
+def resolve_page_href(t)
   ret=t
   refpage(t).select { |pn| File.exists?(page_fname(pn)) }.each do |pn| 
-    t.gsub!("[#{pn}]","<a href='/page/#{pn}'>[#{pn}]</a>")
+    ret.gsub!("[#{pn}]","<a href='/page/#{pn}'>#{pn}</a>")
   end
   ret
 end
 
 def  page_delete(name) 
- raise "error" unless page_move_ok?(name)
+ raise "error" unless page_user?(name)
  fname=page_fname(name)
  if File.exists?(fname)
    history "delete",name,result: "?"
@@ -77,45 +112,62 @@ def  page_delete(name)
  end
 end
 def  page_rename(oldname,newname)
- raise "error" unless page_move_ok?(name)
- raise "error" unless page_move_ok?(newname)
- fname=page_fname(name)
+ raise "error" unless page_user?(newname)
+ raise "error: page '#{newname}' already exist" if page_exist?(newname)
+ fname=page_fname(oldname)
  nn=page_fname(newname)
- if  File.exists?(fname) && (! File.exists?(nn)) && oldame!=newname 
-   history "rename",name,result: "?"
+ if  File.exists?(fname) && (! File.exists?(nn)) && oldname!=newname 
    File.write(nn,File.read(fname))
-   File.write(page_fdiff(newname),page_fdiff(name))   
-   history "rename",name,result: "creation #{newname} done."
-   File.delete(page_fdiff(name))   
+   File.write(page_fdiff(newname),page_fdiff(oldname))   
+   history "rename",oldname,result: "creation #{newname} done."
+   File.delete(page_fdiff(oldname))   
    File.delete(fname)   
-   history "rename",name,result: "delete #{name} done."
+   history "rename",newname,result: "delete #{oldname} done."
  end
 end
 
-def page_move_ok?(name)
-  name!="" && name!="index"
+def page_make_show_modif(name,date)
+ if File.read(page_fdiff(name)) =~ /^%%%\s+#{date.gsub('+',".")}.*?^(.*?)(^%%%|$)/m
+    o,n=*eval($1)
+    doc='Legende:<br><div class="bc diff"><li class="del"><del>ligne detruite/modifÃ©e</del></li>
+    <li class="ins"><ins>nouvelle ligne</ins></li>
+    <li class="unchanged"><span>ligne inchangÃ©e</span></li></div>'
+    html="<style>#{diff_css()}</style>#{doc}<hr>#{diff_to_html(o,n)}"
+ else
+   html= "nomatch"
+ end
+ page_make_view(name,"<h3>Modifications on '#{name}' at #{date}</h3><br><br>#{html}<br>")
 end
 
-############################## Genralities ##############################
+def page_user?(name)  name!="" && name!="index" end
+def page_exist?(name) File.exists?(page_fname(name)) end
+
+############################## Generalities ##############################
+
+def raz_cache()
+ File.delete(indirwiki("list.html")) if File.exists?(indirwiki("list.html"))
+ File.delete(indirwiki("summary.html")) if File.exists?(indirwiki("summary.html"))
+end
 
 def page_find_orphean()
   h={}
-  l=Dir["#{File.dirname(page_fnamenv("s"))}/*"].map { |fn|
+  Dir["#{File.dirname(page_fnamenv("s"))}/*"].each { |fn|
     next if fn =~/\.diff$/
     refpage(File.read(fn)).each { |r| h[r]=true}
   }
   l=Dir["#{File.dirname(page_fnamenv("s"))}/*.diff"].map { |fn|
     fname=fn.split(".")[0..-2].join(".")
     name= File.basename(fname)
-    next if h[name]
+    next(nil) if h[name]
     size=File.size(fname)
     mtime=File.mtime(fname).to_s
-    "<td><a href='/page/#{name}'>#{name}</a></td><td>#{size}</td><td>#{mtime}</td>"
-  }.join("</tr><tr>")
-  "<table class='grid'><tr><th>Name</th><th>Size</th><th>Date</th></tr><tr>#{l}</tr></table>"
+    [name,size,mtime]
+  }.compact
+  table2html(%w{Name  Size Date},l)
 end
 
-def page_list()
+def page_list() memoized(indirwiki("list.html"), proc {page_list1()}) end
+def page_list1()
   h=Hash.new { |h,k| h[k]=[]}
   l=Dir["#{File.dirname(page_fnamenv("s"))}/*"].map { |fn|
     next if fn =~/\.diff$/
@@ -127,12 +179,13 @@ def page_list()
     size=File.size(fname)
     mtime=File.mtime(fname).to_s
     refs= h[name].join(", ")
-    "<td><a href='/page/#{name}'>#{name}</a></td><td>#{refs}</td><td>#{size}</td><td>#{mtime}</td>"
-  }.join("</tr><tr>")
-  "<table class='grid'><tr><th>Name</th><th>References</th><th>Size</th><th>Date</th></tr><tr>#{l}</tr></table>"
+    [name,refs,size,mtime]
+  }
+  table2html(%w{Name References Size Date},l)
 end
 
-def page_make_summary()
+def page_make_summary()  memoized(indirwiki("summary.html"),proc {page_make_summary1()}) end
+def page_make_summary1()
   fils=Hash.new { |h,pere| h[pere]=[]}
   pere=Hash.new { |h,fils| h[fils]=[]}
   l=Dir["#{File.dirname(page_fnamenv("s"))}/*"].map { |fn|
@@ -165,7 +218,12 @@ def page_create(name)
  history('creation',name)
 end
 
-def history(event,pn,opt={})  File.open(flog(),"a+") { |f| f.puts("#{Time.now} | #{pn} : #{event} #{opt.size>0 ? opt.inspect : ''}")} end
+def history(event,pn,opt={})  
+  File.open(flog(),"a+") { |f| 
+     f.puts("#{Time.now} | #{pn} : #{event} #{opt.size>0 ? opt.inspect : ''}")
+  }
+  raz_cache()
+end
 def history_get(size=10_000)  
  logs=File.read(flog()).split(/\r?\n/)
  page_make_view("","<h3>History</h3><br><br>#{logs.join("<br/>")}<br>")
@@ -178,17 +236,39 @@ end
 $renderer = Redcarpet::Render::HTML.new(autolink: true,no_links: false, hard_wrap: false)
 $markdown = Redcarpet::Markdown.new($renderer, extensions = {})
 def wiki_render(txt)  $markdown.render( txt ) end
-
-$index,$template,$edit,$help,$css,_=File.read(__FILE__).split(/^@@ \w+\s*$/)[1..-1]
-
-Dir.mkdir("wiki") unless Dir.exists?("wiki")
-Dir.mkdir("wiki/data") unless Dir.exists?("wiki/data")
-
 def verifpn(name)  raise "name page error : '#{name}'" if name !~ /^\w*$/ end
-def page_fname(name) verifpn(name); "wiki/data/#{name}"      end
-def page_fnamenv(name)              "wiki/data/#{name}"      end
-def page_fdiff(name) verifpn(name); "wiki/data/#{name}.diff" end
-def flog()           "wiki/event.log"         end
+def page_fname(name) verifpn(name); "#{root}/data/#{name}"      end
+def page_fnamenv(name)              "#{root}/data/#{name}"      end
+def page_fdiff(name) verifpn(name); "#{root}/data/#{name}.diff" end
+def flog()           "#{root}/event.log"         end
+def indirwiki(f)     "#{root}/#{f}" end
+ 
+def load_templates()
+  $tpl_file = File.exists?(page_fnamenv("templates")) ? page_fnamenv("templates") : __FILE__
+  $tpl_mtime=File.mtime($tpl_file)
+  $index,$template,$edit,$help,$css,_=File.read($tpl_file).split(/^@@ \w+\s*$/)[1..-1]
+end
+def load_templates_if()
+  tpl_file = File.exists?(page_fnamenv("templates")) ? page_fnamenv("templates") : __FILE__
+  tpl_mtime=File.mtime(tpl_file)
+  load_templates() if tpl_file != $tpl_file || tpl_mtime != $tpl_mtime
+end 
+
+################# Create and verify integrity at startup wiki server ########
+
+Dir.mkdir("#{root}") unless Dir.exists?("#{root}")
+Dir.mkdir("#{root}/data") unless Dir.exists?("#{root}/data")
+Dir.glob("#{root}/data/*").each do |f| 
+  if f=~/.*\.diff$/
+     fd=f.split(".")[0..-2].join(".")
+     File.delete(f) unless File.exists?(fd)
+     next
+  end
+  next if Dir.exists?(f)
+  fd=f+".diff"
+  File.write(fd,"") unless File.exists?(fd)  
+end
+
 
 unless File.exists?(page_fname('index'))
    page_stock("index","<creation>",$index)
@@ -197,6 +277,9 @@ unless File.exists?(flog())
    File.write(flog(),"creation")
 end
 
+##################### Web request on a page ##################
+
+before  do load_templates_if()    end
 get '/' do redirect '/page/index' end
 
 get '/page/:name' do
@@ -217,9 +300,8 @@ get '/edit/:name' do
 end
 
 get '/delete/:name' do  page_delete(params['name']) end
-get '/rename/:name' do page_rename(params['name'],params['newname'])end
+get '/rename/:name/:newname' do  page_rename(params['name'],params['newname'])end
 get '/history/:name' do   page_history(params['name']) end
-get '/logs' do            history_get()                end
 
 post '/write/:name' do
  filename=page_fname(params['name'])
@@ -230,6 +312,15 @@ post '/write/:name' do
  redirect "/page/#{params['name']}"
 end
 
+get '/modif/:name/:date' do  
+  page_make_show_modif(params['name'],params['date']) 
+end
+
+############### general request (not page-related)
+
+get '/logs' do
+  history_get()
+end
 get '/summary' do
    page_make_view("","<h3>Summary</h3><br><br>#{page_make_summary()}<br>")
 end
@@ -253,11 +344,12 @@ get '/css' do
   File.exists?(fn) ? File.read(fn) : $css 
 end
 
+################ TODO
 
 get '/push' do
   request.websocket do |ws|
     ws.onopen do
-      warn("ws connected")
+      #warn("ws connected")
       settings.sockets << ws
       #EM.next_tick { ws.send($gtext.to_html) rescue p $! }
     end
@@ -269,11 +361,13 @@ get '/push' do
       #EM.next_tick { settings.sockets.each{|s| s.send(html) } }
     end
     ws.onclose do
-      warn("websocket closed")
+      #warn("websocket closed")
       settings.sockets.delete(ws)
     end
   end
 end
+raz_cache()
+
 
 __END__
 @@ index
@@ -311,7 +405,6 @@ will be created, empty ...
       <a href='/list'>List all pages and references</a> |
       <a href='/logs'>History</a> |
       <a href='/page/index'>((Home))</a> |
-      &copy; Regis d'Aubarede
     </div>
     <script type="text/javascript">
         var ws = null;
@@ -340,6 +433,18 @@ will be created, empty ...
     <title>Wiki</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/css">
+    <script>
+    function newname(elem) {
+       var n=prompt("new name for page %NAME ?");
+       if (n && n.length>0) {
+          console.log(elem.attributes.href.value)
+          elem.attributes.href.value=elem.attributes.href.value.replace(/%:%/,n);
+          console.log(elem.attributes.href.value)
+          return false;
+       }
+       return true;
+    }
+    </script>
 </head>
 <body>
     <div id='title'>Edit '%NAME%'</div>
@@ -351,14 +456,14 @@ will be created, empty ...
     </div>
     <div id='footer'>
       <a href='/delete/%NAME%'>Delete</a> |
-      <a href='/rename/%NAME%'>Rename</a> |
+      <a href='/rename/%NAME%/%:%' onclick='newname(this)'>Rename</a> |
       <a href='/help'>Help</a> |
       <a href='/page/index'>Home</a> 
-      &copy; Regis d'Aubarede
     </div>
     <div id='preview'></div>
 </body>
 </html>
+
 @@ help
 <htm>
 <head>

@@ -22,14 +22,13 @@ Todo
 
 * images upload,...
 * authentification (?)
-* History is not ok ; diff & patch seem not work.
 * Websocket not ready : the idea is to append a real-time notification to all client connected
-* mini file ewplorer, dropbox like :)
+* mini file explorer, dropbox like : every user can upload/consult/download some files
 
 
 Usage
 -----
-    > gem install sinatra redcarpet diff-lcs
+    > gem install sinatra redcarpet diffy sinatra-websocket
     > cd ...wiki-root
     > ruby /path-to-source/wiki.rb [tcp-port]
 

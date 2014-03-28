@@ -9,14 +9,16 @@ h1   { background: #006666; color: white ; text-align: center;padding: 10px 0px 
 
 div#title   {  color: #EE8833 ; text-align: left; font-size: 30px; margin-left: 20px}
 
-div#footer   {  margin-left: 10px; border-top: 2px solid black; text-align: center;}
+div#footer   {  margin-left: 10px; border-top: 2px solid black; padding-top: 10px;text-align: center;}
 
 div#container   {   margin-left: 30px}
 
 div#footer a { font-weight: bold; ; color: #B73;}
 
-table.grid { border: 3px solid #AAA ; border-collapse: collapse ; width:90%}
+table.grid { border: 2px solid #044 ; border-collapse: collapse ; width:90%}
 
-table.grid th { border: 1px solid #AAA ; background: #FFA;}
+table.grid th { border: 2px solid #AAA ; background: #FFA;}
 
-table.grid td { border: 1px solid #AAA ; margin: 3px 10px 3px 10px;}
+table.grid td { border: 2px solid #AAA ; margin: 3px 10px 3px 10px;}
+
+div.bc { margin: 10px 100px 10px 100px; background: #FFA; border: 2px solid black;width:300px;}
