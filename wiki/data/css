@@ -1,24 +1,29 @@
-/* 
-Cette page n'est pas une documentation !!. elle permet de modifier l'aspect du
-Wiki, ONLINE ...
-*/
-
-body { margin: 0px;}
-
-h1   { background: #006666; color: white ; text-align: center;padding: 10px 0px 10px 0px;}
-
-div#title   {  color: #EE8833 ; text-align: left; font-size: 30px; margin-left: 20px}
-
-div#footer   {  margin-left: 10px; border-top: 2px solid black; padding-top: 10px;text-align: center;}
-
-div#container   {   margin-left: 30px}
-
-div#footer a { font-weight: bold; ; color: #B73;}
-
-table.grid { border: 2px solid #044 ; border-collapse: collapse ; width:90%}
-
-table.grid th { border: 2px solid #AAA ; background: #FFA;}
-
-table.grid td { border: 2px solid #AAA ; margin: 3px 10px 3px 10px;}
-
+/* 
+Cette page n'est pas une documentation !!. elle permet de modifier l'aspect du
+Wiki, ONLINE ...
+*/
+
+body { margin: 0px;}
+
+h1   { background: #006666; color: white ; text-align: center;padding: 10px 0px 10px 0px;}
+
+div#title   {  color: #EE8833 ; text-align: left; font-size: 30px; margin-left: 20px}
+
+div#footer   {  margin-left: 10px; border-top: 2px solid black; padding-top: 10px;text-align: center;}
+
+div#container   {   margin-left: 30px}
+
+div#footer a { font-weight: bold; ; color: #B73;}
+
+table.grid { border: 2px solid #044 ; border-collapse: collapse ; width:90%}
+
+table.grid th { border: 2px solid #AAA ; background: #FFA;}
+
+table.grid td { border: 2px solid #AAA ; margin: 3px 10px 3px 10px;}
+
 div.bc { margin: 10px 100px 10px 100px; background: #FFA; border: 2px solid black;width:300px;}
+
+div.search {  position:absolute; text-align:right; right:0px; top:0px;}
+
+div.searchheader { font-weight: bold; color: #46F;}
+div.scontent     { width:70%;}

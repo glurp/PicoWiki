@@ -12,6 +12,7 @@ PicoWiki :
 Features
 
 * view, edit, link, rename, delete pages
+* search
 * automatic summary (reflexion on pages contents and directories contents)
 * list of orphean pages
 
@@ -22,7 +23,7 @@ Todo
 
 * images upload,...
 * authentification (?)
-* Websocket not ready : the idea is to append a real-time notification to all client connected
+* Websocket not ready : the idea is to make wki page dynamics...
 * mini file explorer, dropbox like : every user can upload/consult/download some files
 
 

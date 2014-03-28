@@ -15,9 +15,9 @@ def root() "wiki" end
 
         
 def diff(old,neww)  [old,neww].inspect       end
-def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
 def diff_css()      Diffy::CSS              end
-def rpatch(neww,d)  eval(d)[0]              end
+def rpatch(d)       eval(d)[0]              end
+def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
 
 set :server, 'thin'  
 set :sockets, []
@@ -54,6 +54,9 @@ end
 
 def refpage(t)  t.scan(/\[(\w+)\](?!\()/).map { |pn| pn.first } end
 def href(name) "<a href='/page/#{name}'>#{name}</a>" end
+
+def page_user?(name)  name!="" && name!="index" &&  name !="templates" end
+def page_exist?(name) File.exists?(page_fname(name)) end
 
 def  page_make_view(name,md=nil)
  if name=="templates" 
@@ -118,12 +121,9 @@ def  page_rename(oldname,newname)
  fname=page_fname(oldname)
  nn=page_fname(newname)
  if  File.exists?(fname) && (! File.exists?(nn)) && oldname!=newname 
-   File.write(nn,File.read(fname))
-   File.write(page_fdiff(newname),page_fdiff(oldname))   
-   history "rename",oldname,result: "creation #{newname} done."
-   File.delete(page_fdiff(oldname))   
-   File.delete(fname)   
-   history "rename",newname,result: "delete #{oldname} done."
+   File.rename(fname,nn)
+   File.rename(page_fdiff(oldname),page_fdiff(newname))
+   history "rename",oldname,result: "rename #{newname} done."
  end
 end
 
@@ -140,8 +140,6 @@ def page_make_show_modif(name,date)
  page_make_view(name,"<h3>Modifications on '#{name}' at #{date}</h3><br><br>#{html}<br>")
 end
 
-def page_user?(name)  name!="" && name!="index" end
-def page_exist?(name) File.exists?(page_fname(name)) end
 
 ############################## Generalities ##############################
 
@@ -238,7 +236,28 @@ def history_get(size=10_000)
  logs=File.read(flog()).split(/\r?\n/)
  page_make_view("","<h3>History</h3><br><br>#{logs.join("<br/>")}<br>")
 end
+def make_sentry(n,regexp,line) 
+  "<br><div class='searchheader'>#{href(n)}</div><ul><div class='scontent'>#{line.gsub(regexp,'<b>\1</b>')}</div></ul>"
+end
 
+def search(words) 
+  rr= /^(.*?)(#{words.split(/\s+/).join('|')})(.*?)^/im
+  r2= /(#{words.split(/\s+/).join('|')})/i
+  p rr,r2
+  ret=[]
+  Dir.glob(root()+"/data/*.diff").each { |fn|
+     f= fn.split(".")[0..-2].join(".")
+     p f
+     File.read(f).gsub( rr ) { |l1,l2,l3|
+        p l1
+        p l2
+        p l3
+        ret << make_sentry(File.basename(f),r2,"#{l1}#{l2}#{l3}")
+     }
+     break if ret.size>100
+  }
+  page_make_view("","<h3>Search</h3><br><br>#{ret.join("<br/>")}<br>")
+end
 #########################################################
 #         web
 #########################################################
@@ -344,6 +363,7 @@ get '/list' do
  c=page_list()
  page_make_view("","<h3>Pages</h3><br><br>#{c}<br>")
 end
+get '/search/:words' do  search(params['words']) end
 
 get '/help' do
  $help
@@ -402,7 +422,13 @@ will be created, empty ...
     <link rel="stylesheet" href="/css">
 </head>
 <body>
-    <div id='title'>%NAME%</div>
+    <div id='title'>
+      %NAME%
+      <div class='search'>
+         <input type='text' id='search' value=''>
+         <input type='button' value=' go ' onclick="location.href='/search/'+document.getElementById('search').value">
+      </div>
+    </div>
     <div id="container">
 %%%
     </div>
@@ -515,11 +541,15 @@ Lien officiel: <a href='http://daringfireball.net/projects/markdown/syntax'>Doc<
 </html>
 @@ css
 body { margin: 0px;}
-h1   { background: black; color: white ; text-align: center;}
+h1   { background: #006666; color: white ; text-align: center;padding: 10px 0px 10px 0px;}
 div#title   {  color: #EE8833 ; text-align: left; font-size: 30px; margin-left: 20px}
-div#footer   {  margin-left: 10px; border-top: 2px solid black; text-align: center;}
+div#footer   {  margin-left: 10px; border-top: 2px solid black; padding-top: 10px;text-align: center;}
 div#container   {   margin-left: 30px}
 div#footer a { font-weight: bold; ; color: #B73;}
-table.grid { border: 2px solid #AAA ; border-collapse: collapse}
-table.grid th { border: 1px solid #AAA ; background: #FFE;}
-table.grid td { border: 1px solid #AAA ;}
+table.grid { border: 2px solid #044 ; border-collapse: collapse ; width:90%}
+table.grid th { border: 2px solid #AAA ; background: #FFA;}
+table.grid td { border: 2px solid #AAA ; margin: 3px 10px 3px 10px;}
+div.bc { margin: 10px 100px 10px 100px; background: #FFA; border: 2px solid black;width:300px;}
+div.search {  position:absolute; text-align:right; right:0px; top:0px;}
+div.searchheader { font-weight: bold; color: #46F;}
+div.scontent     { width:70%;}

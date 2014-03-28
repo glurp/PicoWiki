@@ -1,20 +1,21 @@
-
-
- if  File.exists?(fname) && (! File.exists?(nn)) && oldname!=newname 
-   File.write(nn,File.read(fname))
-   File.write(page_fdiff(newname),page_fdiff(oldname))   
-   history "rename",oldname,result: "creation #{newname} done."
-   File.delete(page_fdiff(oldname))   
-   File.delete(fname)   
-   history "rename",newname,result: "delete #{oldname} done."
- end
-end
-
-def page_ma
-   html= "nomatch"
- end
- page_make_view(name,"<h3>Modifications on '#{name}' at #{date}</h3><br><br>#{html}<br>")
-end
-
-def page_user?(name)  name!="" && name!="index" end
-def page_est?(name) File.exists?(page_fname(name)) end
+
+ if  File.exists?(fname) && (! File.exists?(nn)) && oldname!=newname 
+   File.write(nn,File.read(fname))
+   File.write(page_fdiff(newname),page_fdiff(oldname))   
+   history "rename",oldname,result: "creation #{newname} done."
+   File.delete(page_fdiff(oldname))   
+   File.delete(fname)   
+   history "rename",newname,result: "delete #{oldname} done."
+ end
+end
+aa
+dd
+ff
+def page_ma
+   html= "nomatch"
+ end
+ page_make_view(name,"<h3>Modifications on '#{name}' at #{date}</h3><br><br>#{html}<br>")
+end
+
+def page_user?(name)  name!="" && name!="index" end
+def page_est?(name) File.exists?(page_fname(name)) end
