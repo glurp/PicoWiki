@@ -53,6 +53,7 @@ end
 #########################################################
 
 def refpage(t)  t.scan(/\[(\w+)\](?!\()/).map { |pn| pn.first } end
+def href(name) "<a href='/page/#{name}'>#{name}</a>" end
 
 def  page_make_view(name,md=nil)
  if name=="templates" 
@@ -96,7 +97,7 @@ end
 def resolve_page_href(t)
   ret=t
   refpage(t).select { |pn| File.exists?(page_fname(pn)) }.each do |pn| 
-    ret.gsub!("[#{pn}]","<a href='/page/#{pn}'>#{pn}</a>")
+    ret.gsub!("[#{pn}]",href(pn))
   end
   ret
 end
@@ -150,20 +151,32 @@ def raz_cache()
 end
 
 def page_find_orphean()
-  h={}
+  h=Hash.new {|h,k| h[k]=[]}
   Dir["#{File.dirname(page_fnamenv("s"))}/*"].each { |fn|
     next if fn =~/\.diff$/
-    refpage(File.read(fn)).each { |r| h[r]=true}
+    refpage(File.read(fn)).each { |r| h[r] << fn.split('/').last}
   }
   l=Dir["#{File.dirname(page_fnamenv("s"))}/*.diff"].map { |fn|
     fname=fn.split(".")[0..-2].join(".")
     name= File.basename(fname)
-    next(nil) if h[name]
+    if h[name]
+       h.delete(name)
+       next(nil)
+    end
     size=File.size(fname)
     mtime=File.mtime(fname).to_s
     [name,size,mtime]
   }.compact
-  table2html(%w{Name  Size Date},l)
+  
+  ld=h.map {|(n,l)| [
+    n,
+    l.map {|r|  href(r)}.join(", ")
+  ]}
+  
+  "<h2>Page with no caller</h2>"+
+  table2html(%w{Name  Size Date},l)+
+  "<br><h2>Page called but not exist</h2>"+
+  table2html(%w{Name  referenced-in},ld)
 end
 
 def page_list() memoized(indirwiki("list.html"), proc {page_list1()}) end
@@ -178,8 +191,7 @@ def page_list1()
     name= File.basename(fname)
     size=File.size(fname)
     mtime=File.mtime(fname).to_s
-    refs= h[name].join(", ")
-    [name,refs,size,mtime]
+    [href(name),h[name].map {|r| href(r)}.join(","),size,mtime]
   }
   table2html(%w{Name References Size Date},l)
 end
@@ -200,10 +212,8 @@ def page_make_summary1()
   hdone={}
   frm=proc { |parent,s| 
      hdone[parent]=true
-     s << "<ul><a href='/page/#{parent}'>#{parent}</a><br>"
-     g="\n"
-     pere[parent].each { |f| frm.call(f,g) if ! hdone[f]}
-     s << g
+     s << "<ul>#{href(parent)}<br>\n"
+     pere[parent].each { |f| frm.call(f,s) if ! hdone[f]}
      s << "</ul>\n"
   }
   lroot=pere.keys.select { |k| fils[k].size==0}
@@ -235,13 +245,14 @@ end
 
 $renderer = Redcarpet::Render::HTML.new(autolink: true,no_links: false, hard_wrap: false)
 $markdown = Redcarpet::Markdown.new($renderer, extensions = {})
-def wiki_render(txt)  $markdown.render( txt ) end
-def verifpn(name)  raise "name page error : '#{name}'" if name !~ /^\w*$/ end
-def page_fname(name) verifpn(name); "#{root}/data/#{name}"      end
-def page_fnamenv(name)              "#{root}/data/#{name}"      end
-def page_fdiff(name) verifpn(name); "#{root}/data/#{name}.diff" end
-def flog()           "#{root}/event.log"         end
-def indirwiki(f)     "#{root}/#{f}" end
+
+def wiki_render(txt)   $markdown.render( txt )                                end
+def verifpn(name)      raise "name page error : '#{name}'" if name !~ /^\w*$/ end
+def page_fname(name)   verifpn(name); "#{root}/data/#{name}"                  end
+def page_fnamenv(name) "#{root}/data/#{name}"                                 end
+def page_fdiff(name)   verifpn(name); "#{root}/data/#{name}.diff"             end
+def flog()             "#{root}/event.log"                                    end
+def indirwiki(f)       "#{root}/#{f}"                                         end
  
 def load_templates()
   $tpl_file = File.exists?(page_fnamenv("templates")) ? page_fnamenv("templates") : __FILE__
@@ -401,8 +412,8 @@ will be created, empty ...
       <a href='/help'>Help</a> |
       <a href='/history/%NAME%'>Page history</a> | |
       <a href='/summary'>Summary</a> |
-      <a href='/orphean'>Orphean pages</a> |
-      <a href='/list'>List all pages and references</a> |
+      <a href='/orphean'>Integrity check</a> |
+      <a href='/list'>Page list</a> |
       <a href='/logs'>History</a> |
       <a href='/page/index'>((Home))</a> |
     </div>
