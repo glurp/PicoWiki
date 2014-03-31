@@ -28,3 +28,4 @@ div.search {  position:absolute; text-align:right; right:10px; top:0px;}
 div.searchheader { font-weight: bold; color: #46F;}
 div.scontent     { width:70%;}
 
+div.dform { border: 1px solid #FA0; background: #FFE;}

@@ -21,8 +21,8 @@ def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
 
 set :server, 'thin'  
 set :sockets, []
-set :root,File.dirname(__FILE__)
-set :public_folder, File.dirname(__FILE__)
+set :root,root()
+set :public_folder, root()
 set :bind, '0.0.0.0'
 set :port, ARGV[0] || 9191
 
@@ -63,12 +63,12 @@ def  page_make_view(name,md=nil)
    md="not viewable!"
  end
  md=wiki_render( File.read(page_fname(name)) ) unless md
- md=resolve_page_href(md)
+ md=resolve_page_href(name,md)
  $template.gsub("%NAME%",name).gsub("%%%",md)
 end
 
 def page_make_edit(name)
-  content=File.read(page_fname(name)).gsub(">","&gt;").gsub("<","&lt;")
+  content=File.read(page_fname(name)).gsub(">","&gt;").gsub("<","&lt;")  
   $edit.gsub("%NAME%",name).gsub("%%%",content)
 end
 
@@ -97,10 +97,29 @@ def page_creation_on_content(name,content)
   end
 end
 
-def resolve_page_href(t)
+def resolve_page_href(nm,t) # make some transformatioàn which are not  pure markdown
   ret=t
   refpage(t).select { |pn| File.exists?(page_fname(pn)) }.each do |pn| 
     ret.gsub!("[#{pn}]",href(pn))
+  end
+  ret.gsub!(/I:(http|https)([^\s<]*)/,'<img src="\1\2"/>')
+  ret.gsub!(/I:([^\s<]*)/) do |m| 
+    name=$1.gsub("/","").gsub("..","")
+    src="/assets/#{name}"
+    file="#{root()}#{src}"
+    if File.exists?(file)
+      lien='<img src="/assets/$1"/>'.gsub('$1',name)
+    else 
+      lien=<<-EEND
+        <div class="dform"><form method="post" action="/upload" enctype='multipart/form-data'> 
+          <input type="hidden" name="MAX_FILE_SIZE" value="10000000" />
+          <input type="hidden" name="page_name" value="#{nm}" />
+          <input type='file' name='myfile' value='#{name}'> 
+          <input type='submit' value='Upload image #{name}!'>
+        </form></div>
+      EEND
+    end
+    lien
   end
   ret
 end
@@ -225,6 +244,21 @@ def page_create(name)
  history('creation',name)
 end
 
+post "/upload" do 
+  src=params['myfile'][:tempfile]
+  dst="#{root}/assets/" + params['myfile'][:filename]
+  if File.size(src)<(10*1024*1024)
+    File.open(dst, "wb") { |f| f.write(src.read) }
+    if page_exist?(params['page_name'])
+      redirect("/page/#{params['page_name']}")
+    else
+      return "image uploaded !"
+    end
+  else
+    return "Sorry, the file is to big for an upload! (max: 10MB)"
+  end
+end
+
 def history(event,pn,opt={})  
   File.open(flog(),"a+") { |f| 
      f.puts("#{Time.now} | #{pn} : #{event} #{opt.size>0 ? opt.inspect : ''}")
@@ -307,6 +341,7 @@ end
 
 Dir.mkdir("#{root}") unless Dir.exists?("#{root}")
 Dir.mkdir("#{root}/data") unless Dir.exists?("#{root}/data")
+Dir.mkdir("#{root}/assets") unless Dir.exists?("#{root}/assets")
 Dir.glob("#{root}/data/*").each do |f| 
   if f=~/.*\.diff$/
      fd=f.split(".")[0..-2].join(".")
@@ -448,6 +483,7 @@ you can edit it by click on 'edit' in footer of this pages.
 For create a new page, write a tag like [name_new_page] in a edited page. this page(s)
 will be created, empty ...
 
+image: I:tc.png
 
 @@ template
 <!doctype html>
@@ -567,8 +603,11 @@ principale est le format du courrier électronique en mode texte.</p>
   <tr><th>Tag</th><th>Mise en forme</th><th>Commentaire</th></tr>
   <tr><td>*aa*</td><td><i>aa</i></td><td>italic</td></tr>
   <tr><td>**aa**</td><td><b>aa</b></td><td>bold</td></tr>
-  <tr><td>Enumeration : <br>* choix 1<br>* choix 2</td><td>Enumeration<ul><li>choix 1</li><li>choix 2</li></ul></td><td>bold</td></tr>
-  <tr><td>Enumeration numérotée : <br>1 choix 1<br>1 choix 2</td><td>Enumeration<ol><li>choix 1</li><li>choix 2</li></ol></td><td></td></tr>
+  <tr><td>```aa```</td><td><b><code>aa</code></b></td><td>code</td></tr>
+  <tr><td>I:tc.png</td><td><b><img src="/assets/tc.png"></b></td><td>image, dans /assets</td></tr>
+  <tr><td>!(http://localhost/assets/tc.png)</td><td><b><img src="/assets/tc.png"></b></td><td>image</td></tr>
+  <tr><td>Enumeration : <br>* choix 1<br>* choix 2</td><td>Enumeration<ul><li>choix 1</li><li>choix 2</li></ul></td><td>liste a puces</td></tr>
+  <tr><td>Enumeration numérotée : <br>1 choix 1<br>1 choix 2</td><td>Enumeration<ol><li>choix 1</li><li>choix 2</li></ol></td><td>liste numerotée</td></tr>
   <tr><td>aaaa<br>===</td><td><h1>aa</h1></td><td>titre</td></tr>
   <tr><td>aaaa<br>----</td><td><h2>aa</h2></td><td>titre 2</td></tr>
   <tr><td>aaaa<br>- - -</td><td><h3>aa</h3></td><td>titre 3</td></tr>

@@ -7,7 +7,7 @@ Presentation
 This is *primary* page for your own **Wiki**.
 you can edit it by click on 'edit' in footer of this pages.
 
-For create a new page, write a tag like [name_new_page] in a edited page. this page(s) will be created, empty ...
+For ```create``` a new page, write a tag like [name_new_page] in a edited page. this page(s) will be created, empty ...
 
 Liens internes
 --------------
@@ -15,6 +15,9 @@ Liens internes
 [Err]
 [css]
 [newpage]
+
+image: I:tc.png
+image: I:blogger-31x31.gif
 
 ---
 
@@ -27,7 +30,5 @@ Liens externes
 TODO
 ----
 
-* images upload/edit
-* svg editor upload/edit
-* curves 2d/3d
+* images upload/dir/delete, 
 * code bloc
