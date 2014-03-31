@@ -4,20 +4,39 @@
 ###########################################################################################
 #  wiki.rb 
 ###########################################################################################
-require 'sinatra'
-require 'sinatra-websocket' rescue nil
-require 'redcarpet' 
 require 'tmpdir'
-require 'diffy'
+require 'sinatra'
+require 'redcarpet' 
+require 'sinatra-websocket' rescue nil
+require 'diffy' rescue nil
 
 def root() "wiki" end
 
 
         
-def diff(old,neww)  [old,neww].inspect       end
-def diff_css()      Diffy::CSS              end
-def rpatch(d)       eval(d)[0]              end
-def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
+def diff(old,neww)  [old,neww].inspect        end
+def rpatch(d)       eval(d)[0]                end
+
+if defined?(Diffy)
+  def diff_css()      Diffy::CSS              end
+  def diff_to_html(o,n) Diffy::Diff.new(n,o).to_s(:html)  end
+else
+  def diff_css() 
+    <<-EEND
+    div.diff  { font-family:courier;overflow:auto;font-size:13px; margin:0px} 
+    .ins { background: #FFAAAA;} 
+    .del { background: #AAFFAA;}
+   EEND
+  end
+  def list(o)
+    o.split(/\r?\n/)
+  end
+  def diff_to_html(o,n) 
+     ao=list(o)
+     an=list(n)
+    ((ao-an).map {|l| "<div class='diff ins'>+#{l}</div>"} + (an -ao).map {|l| "<div class='diff del'>-#{l}</div>"}).join("")
+  end
+end
 
 set :server, 'thin'  
 set :sockets, []
@@ -470,23 +489,25 @@ end
 
 ################ TODO
 
-get '/push' do
-  request.websocket do |ws|
-    ws.onopen do
-      #warn("ws connected")
-      settings.sockets << ws
-      #EM.next_tick { ws.send($gtext.to_html) rescue p $! }
-    end
-    ws.onmessage do |msg|
-      markdown = RedcarpetCompat.new(msg)
-      $gtext=markdown
-      #html = markdown.to_html
-      #File.write('markdown.save.txt',markdown) 
-      #EM.next_tick { settings.sockets.each{|s| s.send(html) } }
-    end
-    ws.onclose do
-      #warn("websocket closed")
-      settings.sockets.delete(ws)
+if defined?(SinatraWebsocket)
+  get '/push' do
+    request.websocket do |ws|
+      ws.onopen do
+        #warn("ws connected")
+        settings.sockets << ws
+        #EM.next_tick { ws.send($gtext.to_html) rescue p $! }
+      end
+      ws.onmessage do |msg|
+        markdown = RedcarpetCompat.new(msg)
+        $gtext=markdown
+        #html = markdown.to_html
+        #File.write('markdown.save.txt',markdown) 
+        #EM.next_tick { settings.sockets.each{|s| s.send(html) } }
+      end
+      ws.onclose do
+        #warn("websocket closed")
+        settings.sockets.delete(ws)
+      end
     end
   end
 end
@@ -539,6 +560,7 @@ image: I:tc.png
       <a href='/admin/menu'>admin</a> |
       <a href='/page/index'> Home </a>
     </div>
+<!--   
     <script type="text/javascript">
         var ws = null;
         function clearing() { $('textarea').text('');         }
@@ -554,6 +576,7 @@ image: I:tc.png
           ws.onerror = function (ev)   { console.log('ws error:'+ev); };
         }
     </script>
+-->
 </body>
 </html>
 
