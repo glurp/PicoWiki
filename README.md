@@ -11,8 +11,8 @@ PicoWiki :
 
 Features
 
-* view, edit, link internal/external, rename, delete pages
-* images upload, search, 
+* view, edit, link internal/external, rename, delete pages, search
+* images upload, list, delete
 * admin: export (to one html file), backup (download dated tgz)
 * automatic summary (reflexion on pages contents and directories contents)
 * integrity check:  list of orphean pages, list of dead link pages, check at server startup
