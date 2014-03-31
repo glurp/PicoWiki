@@ -14,6 +14,7 @@ def root() "wiki" end
 
 
 
+set :thread, 'false'  
 set :server, 'thin'  
 set :sockets, []
 set :root,root()
@@ -285,7 +286,7 @@ def history(event,pn,opt={})
   File.open(flog(),"a+") { |f| 
      f.puts("#{Time.now} | #{pn} : #{event} #{opt.size>0 ? opt.inspect : ''}")
   }
-  raz_cache()
+  raz_cache() if event=="update" || event=="creation" || event=="delete"
 end
 def history_get(size=10_000)  
  logs=File.read(flog()).split(/\r?\n/)
@@ -454,12 +455,15 @@ get '/admin/:cat' do
     c="<ul>"+l.map {|a| "<li><a href='/admin/#{a}'>#{a}</a></li>"}.join("\n")+"</ul>"
     page_make_view(title,"<h1>Administration</h1><br><br>#{c}<br>")
   when "export"
+    history("export","all")
     page_make_view("",page_export)
   when "backup"
-    name="wiki_backup_#{Time.now.strftime('%Y_%m_%d')}.tgz"
+    fname="wiki_backup_#{Time.now.strftime('%Y_%m_%d')}.tgz"
+    name="#{root()}/#{fname}"
     system("tar","czf",name,root())
     s=File.size(name)
-    page_make_view("Admin: backup","<h1>Administration</h1><br><br><a href='/#{name}'>downoad #{s/1024} Kb...</a><br><br><br>")
+    history("backup","all",name: fname, size: s)
+    page_make_view("Admin: backup","<h1>Administration</h1><br><br><a href='/#{fname}'>downoad #{s/1024} Kb...</a><br><br><br>")
   when "images"    
     li=table2html(%w{name size date view Action},
       Dir.glob("#{root()}/assets/*.*").map { |fn|
@@ -478,6 +482,7 @@ get '/imagedelete/:filename' do
  fn="#{root}/assets/#{params['filename']}"
  if File.exists?(fn)
    File.delete(fn)
+   history("delete","image",name: fn)
    "File #{params['filename']} deleted"
  else
    "Unknown image file '#{params['filename']}'"
