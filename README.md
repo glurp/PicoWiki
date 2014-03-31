@@ -22,7 +22,7 @@ Inspired by tipiwiki.
 
 Todo
 ----
-
+* verify with a big wiki : wikified a bible?
 * authentification (?)
 * Websocket (work but not use..) : to make wiki pages dynamics...
 * mini file-explorer : every user could upload/consult/download some files

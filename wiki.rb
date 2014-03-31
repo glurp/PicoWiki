@@ -13,6 +13,20 @@ require 'diffy' rescue nil
 def root() "wiki" end
 
 
+
+set :server, 'thin'  
+set :sockets, []
+set :root,root()
+set :public_folder, root()
+set :bind, '0.0.0.0'
+set :port, ARGV[0] || 9191
+
+
+#########################################################
+##  Utilities
+#########################################################
+
+################ Diff / Patch ###########################
         
 def diff(old,neww)  [old,neww].inspect        end
 def rpatch(d)       eval(d)[0]                end
@@ -38,17 +52,6 @@ else
   end
 end
 
-set :server, 'thin'  
-set :sockets, []
-set :root,root()
-set :public_folder, root()
-set :bind, '0.0.0.0'
-set :port, ARGV[0] || 9191
-
-
-#########################################################
-##  Utilities
-#########################################################
 def memoized(filename,traitment)
   if File.exists?(filename)
      File.read(filename)
