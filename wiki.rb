@@ -428,7 +428,7 @@ get '/admin/:cat' do
  title="Admin"
  case cat
   when "menu"
-    l=%w{export backup}
+    l=%w{export backup images}
     c="<ul>"+l.map {|a| "<li><a href='/admin/#{a}'>#{a}</a></li>"}.join("\n")+"</ul>"
     page_make_view(title,"<h1>Administration</h1><br><br>#{c}<br>")
   when "export"
@@ -437,9 +437,29 @@ get '/admin/:cat' do
     name="wiki_backup_#{Time.now.strftime('%Y_%m_%d')}.tgz"
     system("tar","czf",name,root())
     s=File.size(name)
-    page_make_view(title,"<h1>Administration</h1><br><br><a href='/#{name}'>downoad #{s/1024} Kb...</a><br><br><br>")
+    page_make_view("Admin: backup","<h1>Administration</h1><br><br><a href='/#{name}'>downoad #{s/1024} Kb...</a><br><br><br>")
+  when "images"    
+    li=table2html(%w{name size date view Action},
+      Dir.glob("#{root()}/assets/*.*").map { |fn|
+         [File.basename(fn), File.size(fn),File.mtime(fn),File.size(fn)<32000 ? 
+           "<img src='/assets/#{File.basename(fn)}'/>" :
+           "<a href='/assets/#{File.basename(fn)}'>Image</a>",
+           "<a href='/imagedelete/#{File.basename(fn)}'>Delete...</a>"
+           ]
+      })
+    page_make_view("admin: images","<h1>Images lists</h1><br><br>#{li}")
  end
   
+end
+
+get '/imagedelete/:filename' do 
+ fn="#{root}/assets/#{params['filename']}"
+ if File.exists?(fn)
+   File.delete(fn)
+   "File #{params['filename']} deleted"
+ else
+   "Unknown image file '#{params['filename']}'"
+ end
 end
 
 get '/css' do 
